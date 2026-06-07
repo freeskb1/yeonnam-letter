@@ -945,9 +945,9 @@ async function startSound(){
    const an=sndCtx.createAnalyser(); an.fftSize=512; src.connect(an);
    const buf=new Uint8Array(an.fftSize);
    const FLOOR=0.06;       // 소리 감지 기준
-   const FILL_MS=5000;     // 소리를 내면 약 5초 만에 가득
-   const GRACE_MS=500;     // 멈춰도 0.5초까지는 그대로 유지
-   const DRAIN_MS=1200;    // 0.5초 넘게 멈추면 약 1.2초에 걸쳐 빠르게 빠짐
+   const FILL_MS=3000;     // 소리를 내면 약 3초 만에 가득(더 잘 참)
+   const GRACE_MS=1500;    // 멈춰도 1.5초까지는 그대로 유지
+   const DRAIN_MS=5000;    // 그 후에는 약 5초에 걸쳐 천천히 빠짐
    let sndLastT=performance.now(), sndSilence=0;
    const loop=()=>{
      an.getByteTimeDomainData(buf);
