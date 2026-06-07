@@ -194,7 +194,7 @@ body{background:#2e2e30;display:flex;align-items:center;justify-content:center;f
 .imgzoom .zhint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:rgba(255,255,255,.6);font-size:11px;font-family:'Gothic A1';pointer-events:none;}
 .scrim{position:absolute;inset:0;background:rgba(20,18,16,.5);opacity:0;transition:opacity .3s;}
 .overlay.on .scrim{opacity:1;}
-.dlg{position:absolute;left:30px;right:30px;top:50%;transform:translateY(-50%) scale(.85);opacity:0;background:#fbfbf9;border:1.5px solid #1a1a1a;padding:26px 24px 20px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);transition:transform .32s cubic-bezier(.34,1.56,.64,1),opacity .25s;background-image:linear-gradient(#e6e6df 1px,transparent 1px),linear-gradient(90deg,#e6e6df 1px,transparent 1px);background-size:26px 26px;}
+.dlg{position:absolute;left:30px;right:30px;top:50%;transform:translateY(-50%) scale(.85);opacity:0;background:#fbfbf9;border:1.5px solid #1a1a1a;padding:26px 24px 20px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);transition:transform .32s cubic-bezier(.34,1.56,.64,1),opacity .25s;}
 .overlay.on .dlg{transform:translateY(-50%) scale(1);opacity:1;}
 .dlg .dt{font-family:'Nanum Myeongjo';font-weight:800;font-size:17px;color:#1a1a1a;margin-bottom:10px;}
 .dlg .dd{font-family:'Nanum Myeongjo';font-size:13px;color:#888;line-height:1.7;margin-bottom:18px;}
@@ -735,8 +735,8 @@ const Q2_PRE='우리는 늘 가위바위보로 정했었어.<br>너는 매번 �
 const Q2_POST='그렇게 우리의 사랑은 시작됐어.<br>이기든 지든,<br>결국 같이 걷는 우리였으니까.';
 const Q4_PRE='이 돌다리를 건널 때도<br>우리는 가위바위보를 했어.<br>너는 늘 끝 칸에 서서,<br>나를 빤히 쳐다보며 놀리곤 했어.';
 const Q4_POST='혹시나 내가 넘어질까,<br>지켜봐 줘서 고마웠어.<br>너가 있는 그 끝 칸을 넘어,<br>결국 내가 먼저 건넜지만 말이야!';
-let STATS={hints:0,deduct:0,solved:new Set(),start:null,endReached:false};
-function resetStats(){ STATS={hints:0,deduct:0,solved:new Set(),start:null,endReached:false}; }
+let STATS={hints:0,deduct:0,solved:new Set(),start:null,endReached:false,hintMap:{}};
+function resetStats(){ STATS={hints:0,deduct:0,solved:new Set(),start:null,endReached:false,hintMap:{}}; }
 function fmtTime(ms){ const s=Math.max(0,Math.floor(ms/1000)); const m=Math.floor(s/60), ss=s%60; if(m>=60){const h=Math.floor(m/60); return h+'시간 '+(m%60)+'분';} return m+'분 '+ss+'초'; }
 function calcScore(){ return Math.max(0, 100 - STATS.deduct); }
 function restartGame(){ closeOverlay(); ['endmsg','acovemark','endwhite'].forEach(id=>{const e=document.getElementById(id); if(e)e.classList.remove('on');}); const fb=document.getElementById('fadeblack'); if(fb) fb.classList.remove('on'); resetStats(); show(0); }
@@ -782,8 +782,8 @@ function resultScreen(){
 const SAVE_KEY='bumpyeon_save_v1';
 function saveState(){
  try{
-   if(typeof cur!=='number' || cur<2){ localStorage.removeItem(SAVE_KEY); return; }
-   localStorage.setItem(SAVE_KEY, JSON.stringify({cur:cur,hints:STATS.hints,deduct:STATS.deduct,solved:[...STATS.solved],start:STATS.start,endReached:STATS.endReached}));
+   if(typeof cur!=='number' || cur<2 || (screens[cur]&&screens[cur].id==='result')){ localStorage.removeItem(SAVE_KEY); return; }
+   localStorage.setItem(SAVE_KEY, JSON.stringify({cur:cur,hints:STATS.hints,deduct:STATS.deduct,solved:[...STATS.solved],start:STATS.start,endReached:STATS.endReached,hintMap:STATS.hintMap||{}}));
  }catch(e){}
 }
 function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
@@ -792,7 +792,7 @@ function restoreState(){
    const raw=localStorage.getItem(SAVE_KEY); if(!raw) return false;
    const st=JSON.parse(raw);
    if(typeof st.cur!=='number' || st.cur<2 || st.cur>=screens.length) return false;
-   STATS={hints:st.hints||0,deduct:st.deduct||0,solved:new Set(st.solved||[]),start:st.start||Date.now(),endReached:!!st.endReached};
+   STATS={hints:st.hints||0,deduct:st.deduct||0,solved:new Set(st.solved||[]),start:st.start||Date.now(),endReached:!!st.endReached,hintMap:st.hintMap||{}};
    show(st.cur);
    return true;
  }catch(e){ return false; }
@@ -810,7 +810,8 @@ screens.forEach((sc,i)=>{
 });
 updateBar();
 restoreState();
-window.addEventListener('pageshow',()=>{ try{ closeOverlay(); }catch(e){} });
+window.addEventListener('pageshow',(e)=>{ try{ closeOverlay(); if(e&&e.persisted&&typeof cur==='number') show(cur); }catch(err){} });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ try{ closeOverlay(); if(typeof cur==='number'){ const pg=document.querySelector('.page.on'); if(!pg) show(cur); } }catch(e){} } });
 
 function show(i){
  closeOverlay();
@@ -819,7 +820,7 @@ function show(i){
  cur=i; updateBar();
  // 동적 초기화
  const id=screens[i].id;
- CUR_Q = QDATA[id] || null; CUR_ID = id; hintStage=0;
+ CUR_Q = QDATA[id] || null; CUR_ID = id; hintStage=(STATS.hintMap&&STATS.hintMap[id])||0; syncHints();
  if(STATS.start===null && id!=='title') STATS.start=Date.now();
  if(id==='result'){ const rp=document.getElementById('pg-result'); if(rp) rp.innerHTML=html('result'); }
  const cp=document.getElementById('copyr'); if(cp) cp.style.display=(id==='title'||id==='ending')?'block':'none';
@@ -864,32 +865,45 @@ function openHint(){
  else { t='정답을 볼까요?'; d='정답을 보면 점수가 가장 많이 차감돼요.'; c='−3점'; }
  showOverlay(`<div class="dlg"><div class="dt">${t}</div><div class="dd">${d} <span class="cost">(${c})</span></div><div class="drow"><button class="no" onclick="closeOverlay()">아니요</button><button class="yes" onclick="revealHint()">네, 볼게요</button></div></div>`);
 }
-function revealHint(){
+function renderHintBox(stage){
+ // stage: 0,1 = HINT1/2, 2 = ANSWER. (STATS는 건드리지 않고 표시만)
  const hints=curHints();
- const body = hintStage<2 ? hints[hintStage] : curAnswerText();
- const label = hintStage<2 ? ('HINT '+(hintStage+1)) : 'ANSWER';
+ const body = stage<2 ? hints[stage] : curAnswerText();
+ const label = stage<2 ? ('HINT '+(stage+1)) : 'ANSWER';
+ const pg=document.querySelector('.page.on .inner'); if(!pg) return;
+ const hb=document.createElement('div');
+ hb.className='hintbox';
+ hb.style.cssText='background:#fff;border:1px dashed #1a1a1a;padding:12px 14px;margin:10px 0;';
+ hb.innerHTML=`<div style="font-family:'Space Mono';font-size:10px;color:#b56a28;font-weight:700;margin-bottom:4px;">${label}</div><div style="font-family:'Nanum Myeongjo';font-size:13.5px;line-height:1.6;">${body}</div>`;
+ const qbox=pg.querySelector('.qbox');
+ if(qbox) pg.insertBefore(hb,qbox); else pg.appendChild(hb);
+ if(label==='ANSWER' && CUR_ID==='q2'){
+   const fs=document.createElement('div');
+   fs.className='hintforce';
+   fs.style.cssText='text-align:center;margin:2px 0 12px;';
+   fs.innerHTML=`<span onclick="rpsFound()" style="display:inline-block;font-family:'Gothic A1';font-weight:700;font-size:12px;color:#b56a28;border-bottom:1.5px solid #e0833f;cursor:pointer;">동작이 안 되나요? · 강제 이동하기</span>`;
+   pg.appendChild(fs);
+ }
+}
+function disableHintBtn(){
+ document.querySelectorAll('.page.on .hintmini, .page.on .hint-only').forEach(b=>{ b.disabled=true; b.classList.add('hint-done'); });
+}
+function syncHints(){
+ // 현재 페이지의 힌트 박스를 hintStage에 맞게 다시 그림(복원/재방문 시 중복·소실 방지)
+ const pg=document.querySelector('.page.on .inner'); if(!pg) return;
+ pg.querySelectorAll('.hintbox,.hintforce').forEach(e=>e.remove());
+ for(let s=0;s<hintStage;s++) renderHintBox(s);
+ if(hintStage>=3) disableHintBtn();
+}
+function revealHint(){
+ if(hintStage>=3) return;
  closeOverlay();
- const pg=document.querySelector('.page.on .inner');
- if(pg){
-   const hb=document.createElement('div');
-   hb.style.cssText='background:#fff;border:1px dashed #1a1a1a;padding:12px 14px;margin:10px 0;';
-   hb.innerHTML=`<div style="font-family:'Space Mono';font-size:10px;color:#b56a28;font-weight:700;margin-bottom:4px;">${label}</div><div style="font-family:'Nanum Myeongjo';font-size:13.5px;line-height:1.6;">${body}</div>`;
-   const qbox=pg.querySelector('.qbox');
-   if(qbox) pg.insertBefore(hb,qbox); else pg.appendChild(hb);
-   if(label==='ANSWER' && CUR_ID==='q2'){
-     const fs=document.createElement('div');
-     fs.style.cssText='text-align:center;margin:2px 0 12px;';
-     fs.innerHTML=`<span onclick="rpsFound()" style="display:inline-block;font-family:'Gothic A1';font-weight:700;font-size:12px;color:#b56a28;border-bottom:1.5px solid #e0833f;cursor:pointer;">동작이 안 되나요? · 강제 이동하기</span>`;
-     pg.appendChild(fs);
-   }
- }
+ renderHintBox(hintStage);
  STATS.hints++; STATS.deduct += (hintStage===0?1:hintStage===1?2:3);
- hintStage++; saveState();
- if(hintStage>=3){ // 정답까지 표시됨 → 현재 페이지 힌트 버튼 비활성화
-   document.querySelectorAll('.page.on .hintmini, .page.on .hint-only').forEach(b=>{
-     b.disabled=true; b.classList.add('hint-done');
-   });
- }
+ hintStage++;
+ STATS.hintMap = STATS.hintMap || {}; STATS.hintMap[CUR_ID]=hintStage;
+ saveState();
+ if(hintStage>=3) disableHintBtn();
 }
 let CUR_Q=null, CUR_ID=null;
 function checkAns(){
@@ -914,6 +928,7 @@ function foundPopup(after){
  showOverlay(`<div class="dlg letter-dlg"><div class="found"><div class="ft">수현이의 편지를 발견하였습니다.</div></div><div class="foundletter">${after}</div><button class="full" onclick="closeOverlay();hintStage=0;next();">다음 장소로</button></div>`);
 }
 function rpsFound(){
+ releaseMic();   // 챕터 클리어 → 마이크 완전히 끔
  if(CUR_ID && PUZZLE_IDS.includes(CUR_ID)) STATS.solved.add(CUR_ID); saveState();
  showOverlay(`<div class="dlg letter-dlg"><div class="found"><div class="ft">수현이의 편지를 발견하였습니다.</div></div><div class="foundletter">${Q2_POST}</div><button class="full" onclick="closeOverlay();hintStage=0;next();">다음</button></div>`);
 }
@@ -975,6 +990,10 @@ function stopSound(){
  if(sndStream && sndStream!==MIC_STREAM) sndStream.getTracks().forEach(t=>t.stop());
  if(sndCtx && sndCtx.state!=='closed'){ try{sndCtx.close();}catch(e){} }
  sndCtx=sndStream=sndRAF=null;
+}
+function releaseMic(){
+ try{ if(MIC_STREAM){ MIC_STREAM.getTracks().forEach(t=>t.stop()); } }catch(e){}
+ MIC_STREAM=null;
 }
 function winClear(){
  if(sndDone) return; sndDone=true;
@@ -1143,7 +1162,7 @@ function openUltra(){
      <div class="ultra-photo"><img src="${ULTRA_IMG}" alt="초음파 사진"/></div>
      <div class="ultra-note">
        <div class="note-txt">${ULTRA_LETTER}</div>
-       <div class="ultra-sys"><span class="ul-bar"></span>처음 편지를 다시 읽어보시겠어요?<br>그 편지는 미래의 아이에게 보내는 편지였습니다.</div>
+       <div class="ultra-sys"><span class="ul-bar"></span>처음 주웠던 편지를 다시 읽어보시겠어요?<br>그 편지는 수현이가 미래의 아이에게 남겨둔 편지였습니다.</div>
      </div>
    </div>
    <button class="ultra-btn" onclick="closeUltraToTrans()">다음</button>
@@ -1237,7 +1256,7 @@ function startGame(){
 }
 function checkCode(){
  const c=document.getElementById('codeinput'); const v=(c?c.value:'').trim();
- if(v.toUpperCase()==='ACOVE2026'){ closeOverlay(); show(screens.findIndex(s=>s.id==='act1')); }
+ if(v.toUpperCase()==='ACOVE2026'){ closeOverlay(); clearSave(); resetStats(); show(screens.findIndex(s=>s.id==='act1')); }
  else { const e=document.getElementById('codeerr'); if(e) e.textContent='코드가 올바르지 않습니다.'; if(c){ c.value=''; c.focus(); } }
 }
 function reaskPerms(){
