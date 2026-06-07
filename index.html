@@ -141,14 +141,15 @@ body{background:#2e2e30;display:flex;align-items:center;justify-content:center;f
 /* 엔딩 */
 .pillar{background:#2C3E5D;padding:12px;}
 .paper{display:flex;flex-direction:column;}
-.seg{padding:16px;font-family:'Nanum Myeongjo';font-size:13px;line-height:2.0;height:130px;display:flex;align-items:center;-webkit-tap-highlight-color:transparent;}
+  #endpaper{touch-action:pan-y;}
+.seg{padding:16px;font-family:'Nanum Myeongjo';font-size:13px;line-height:2.0;height:130px;display:flex;align-items:center;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
 .s1,.s6{background:#F5C518;color:#5a4a08;}
 .s2{background:#1B5FA8;color:#dce9f6;}
 .s3{background:#fff;color:#2a2a26;box-shadow:inset 0 0 0 1px #ececec;height:auto;padding:20px 16px;}
 .s3b{background:#fff;color:#2a2a26;box-shadow:inset 0 0 0 1px #ececec;}
 .s4{background:#1F586F;color:#d6ecf2;}
 .s5{background:#2B8A3E;color:#e2f3e5;}
-.pink{min-height:130px;background:linear-gradient(135deg,#f2aec0,#e895b0);display:flex;align-items:center;color:#7a3050;font-size:13px;font-family:'Nanum Myeongjo';line-height:2.0;text-align:left;padding:18px 16px;-webkit-tap-highlight-color:transparent;}
+.pink{min-height:130px;background:linear-gradient(135deg,#f2aec0,#e895b0);display:flex;align-items:center;color:#7a3050;font-size:13px;font-family:'Nanum Myeongjo';line-height:2.0;text-align:left;padding:18px 16px;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;}
 .ultra{height:130px;border:1px solid #888;background:repeating-linear-gradient(45deg,#2a2a2c,#2a2a2c 8px,#323234 8px,#323234 16px);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#aaa;font-size:11px;font-family:'Gothic A1';cursor:pointer;}
 .ultra small{color:#7a766a;font-size:9px;}
 .ultra-reveal{position:relative;width:100%;border:1px solid #2a2a2c;background:#1d1d1f;cursor:pointer;overflow:hidden;animation:ultraFade .8s ease both;}
@@ -664,8 +665,8 @@ function q2CipherScreen(){
    <div style="text-align:center;font-family:'Nanum Myeongjo';font-weight:800;font-size:15px;margin-bottom:10px;" class="sr3">자, 한 판 해볼까?</div>
    <div class="cipher sr3">
      <div class="cell"><span class="e">✊</span><span>바위</span><div class="col">I<br>W<br>N</div></div>
-     <div class="cell"><span class="e">✋</span><span>보</span><div class="col">X<br>O<br>E</div></div>
      <div class="cell"><span class="e">✌️</span><span>가위</span><div class="col">S<br>T<br>O</div></div>
+     <div class="cell"><span class="e">✋</span><span>보</span><div class="col">X<br>O<br>E</div></div>
    </div>
    <div class="qbox sr3"><button class="hintmini" onclick="openHint()">${SVG_SEARCH}</button><input id="ansinput" placeholder="정답 입력"/><button class="submit" onclick="checkAns()">${SVG_SEND}</button></div>
    <div class="hinthelp sr3">막히면 ${SVG_SEARCH} 힌트를 사용해 보세요</div>
@@ -824,7 +825,7 @@ function show(i){
  if(STATS.start===null && id!=='title') STATS.start=Date.now();
  if(id==='result'){ const rp=document.getElementById('pg-result'); if(rp) rp.innerHTML=html('result'); }
  const cp=document.getElementById('copyr'); if(cp) cp.style.display=(id==='title'||id==='ending')?'block':'none';
- if(id==='ending') STATS.endReached=true;
+ if(id==='ending'){ STATS.endReached=true; setupEndPinch(); }
  if(id==='howto'){ howtoIdx=0; setTimeout(renderHowto,30); }
  if(id==='act1'||id==='act2'||id==='act3'){ 
    document.querySelector('.page.on').onclick=()=>next();
@@ -1135,29 +1136,34 @@ function dolClear(){ foundPopup('혹시나 내가 넘어질까,<br>지켜봐 줘
 
 /* 엔딩 */
 let pinkPeeled=false;
-let pinchN=0, pinchBase=null;
-/* 분홍 칸 '꼬집기'를 document 레벨에서 감지 — 칸 자체엔 리스너가 없어
-   한 손가락 터치 시 다른 칸과 완전히 동일(안드로이드 미세 반응 차이 제거) */
-function _pinchOverPink(t0,t1){
+let _pinchBase=null, _endPinchBound=false;
+function _overPink(x,y){
   const pink=document.getElementById('pinkseg'); if(!pink) return false;
   const r=pink.getBoundingClientRect();
-  const mx=(t0.clientX+t1.clientX)/2, my=(t0.clientY+t1.clientY)/2;
-  return mx>=r.left && mx<=r.right && my>=r.top && my<=r.bottom;
+  return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
 }
-document.addEventListener('touchstart',(e)=>{
-  if(e.touches.length>=2 && document.getElementById('pinkseg')){ pinchN=1; pinchBase=null; }
-},{passive:true});
-document.addEventListener('touchmove',(e)=>{
-  if(pinchN!==1 || e.touches.length<2) return;
-  if(!document.getElementById('pinkseg')){ pinchN=0; return; }
-  const t0=e.touches[0], t1=e.touches[1];
-  const dist=Math.hypot(t0.clientX-t1.clientX, t0.clientY-t1.clientY);
-  if(pinchBase===null){ pinchBase=dist; return; }
-  if(pinchBase>=70 && (pinchBase-dist)>pinchBase*0.55 && _pinchOverPink(t0,t1)){
-    pinchN=0; pinchBase=null; peelPink();
-  }
-},{passive:true});
-document.addEventListener('touchend',(e)=>{ if(e.touches.length<2) pinchN=0; },{passive:true});
+/* 핀치(두 손가락 꼬집기)로만 클리어. 리스너는 칸이 아니라 편지 전체(#endpaper)에 동일하게 부착
+   → 한 손가락 터치·드래그 시 분홍 칸과 일반 칸의 반응이 100% 동일.
+   두 손가락일 때만 preventDefault로 iOS/안드로이드 줌을 막아 핀치가 코드까지 전달되게 함. */
+function setupEndPinch(){
+  if(_endPinchBound) return;
+  const ep=document.getElementById('endpaper'); if(!ep) return;
+  _endPinchBound=true;
+  ep.addEventListener('touchstart',(e)=>{ if(e.touches.length===2) _pinchBase=null; },{passive:true});
+  ep.addEventListener('touchmove',(e)=>{
+    if(e.touches.length!==2) return;             // 한 손가락은 손대지 않음(스크롤 정상)
+    const a=e.touches[0], b=e.touches[1];
+    e.preventDefault();                          // 두 손가락에 한해 줌 차단
+    const dist=Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+    const mx=(a.clientX+b.clientX)/2, my=(a.clientY+b.clientY)/2;
+    if(_pinchBase===null){ _pinchBase=dist; return; }
+    if(_pinchBase>=50 && (_pinchBase-dist)>40 && _overPink(mx,my)){  // 벌린 뒤 꼬집기 + 분홍 위
+      _pinchBase=null; peelPink();
+    }
+  },{passive:false});
+  ep.addEventListener('touchend',(e)=>{ if(e.touches.length<2) _pinchBase=null; },{passive:true});
+  ep.addEventListener('touchcancel',()=>{ _pinchBase=null; },{passive:true});
+}
 function peelPink(){
  const pink=document.getElementById('pinkseg');
  if(!pink) return;
@@ -1242,7 +1248,7 @@ function goResult(){
  const host=fb.parentNode;
  const mk=(id,cls)=>{ let e=document.getElementById(id); if(!e){ e=document.createElement('div'); e.id=id; e.className=cls; host.appendChild(e);} return e; };
  const end=mk('endmsg','endmsg'); end.innerHTML='이야기가 끝났습니다.<br>감사합니다.';
- const acv=mk('acovemark','acovemark'); acv.textContent='';  /* 글씨 없는 하얀 화면 */
+ const acv=mk('acovemark','acovemark'); acv.innerHTML=`<div style="font-family:'Nanum Myeongjo',serif;letter-spacing:normal;text-indent:0;line-height:1.9;"><div style="font-size:15px;font-weight:700;margin-bottom:14px;">도움 주신 분들</div><div style="font-size:15px;font-weight:400;">민주<br>윤정<br>하영</div><div style="font-family:'Space Mono',serif;font-size:12px;letter-spacing:.25em;margin-top:22px;color:#555;font-weight:700;">THANK FOR</div></div>`;
  const wht=mk('endwhite','endwhite');
  [end,acv,wht].forEach(e=>e.classList.remove('on'));
  fb.classList.add('on');                                 // 1) 검은 화면 + 종료 문구
