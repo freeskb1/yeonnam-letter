@@ -944,13 +944,18 @@ async function startSound(){
    const src=sndCtx.createMediaStreamSource(sndStream);
    const an=sndCtx.createAnalyser(); an.fftSize=512; src.connect(an);
    const buf=new Uint8Array(an.fftSize);
-   const FLOOR=0.07;   // 잡음/말소리 무시 기준
+   const FLOOR=0.06;       // 소리 감지 기준
+   const FILL_MS=5000;     // 소리를 내면 약 5초 만에 가득
+   const GRACE_MS=500;     // 멈춰도 0.5초까지는 그대로 유지
+   const DRAIN_MS=1200;    // 0.5초 넘게 멈추면 약 1.2초에 걸쳐 빠르게 빠짐
+   let sndLastT=performance.now(), sndSilence=0;
    const loop=()=>{
      an.getByteTimeDomainData(buf);
      let sum=0; for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128; sum+=v*v;}
      const vol=Math.sqrt(sum/buf.length);            // 0~1 RMS
-     if(vol>FLOOR){ sndFill=Math.min(1,sndFill+(vol-FLOOR)*0.10); }
-     else { sndFill=Math.max(0,sndFill-0.006); }      // 조용하면 서서히 빠짐 → 지속적인 소리 필요
+     const nowT=performance.now(); const dt=Math.min(120, nowT-sndLastT); sndLastT=nowT;
+     if(vol>FLOOR){ sndSilence=0; sndFill=Math.min(1, sndFill + dt/FILL_MS); }   // 소리 내는 동안만 차오름(크기 무관, 시간 기준)
+     else { sndSilence+=dt; if(sndSilence>GRACE_MS) sndFill=Math.max(0, sndFill - dt/DRAIN_MS); }   // 0.5초 유지 후 빠르게 빠짐
      applyFill();
      if(sndFill>=1){ winClear(); return; }
      sndRAF=requestAnimationFrame(loop);
