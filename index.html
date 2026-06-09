@@ -811,8 +811,21 @@ screens.forEach((sc,i)=>{
 });
 updateBar();
 restoreState();
-window.addEventListener('pageshow',(e)=>{ try{ closeOverlay(); if(e&&e.persisted&&typeof cur==='number') show(cur); }catch(err){} });
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ try{ closeOverlay(); if(typeof cur==='number'){ const pg=document.querySelector('.page.on'); if(!pg) show(cur); } }catch(e){} } });
+function resyncCurrent(){
+  // 화면을 다시 그리지 않고 '현재 문제 상태'만 확실히 복구 (CUR_Q/단계/힌트박스/활성페이지)
+  if(typeof cur!=='number' || cur<0 || cur>=screens.length) return;
+  const id=screens[cur].id;
+  CUR_Q = QDATA[id] || null; CUR_ID = id;
+  hintStage = (STATS.hintMap && STATS.hintMap[id]) || 0;
+  const pages=[...document.querySelectorAll('.page')];
+  pages.forEach(p=>p.classList.toggle('on',+p.dataset.i===cur));
+  try{ syncHints(); }catch(e){}
+}
+/* 오래 방치 후 복귀(잠금해제·탭전환·bfcache·재로딩)면 경우를 가리지 않고 무조건 재동기화.
+   기존엔 사용자가 손으로 뒤로/앞으로 해야 살아나던 것을 자동화 — 스크롤 위치는 건드리지 않음 */
+window.addEventListener('pageshow',()=>{ try{ closeOverlay(); resyncCurrent(); }catch(e){} });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ try{ closeOverlay(); resyncCurrent(); }catch(e){} } });
+window.addEventListener('focus',()=>{ try{ resyncCurrent(); }catch(e){} });
 
 function show(i){
  closeOverlay();
@@ -859,6 +872,7 @@ function curAnswerText(){
  return '정답을 확인했어요.';
 }
 function openHint(){
+ if(!CUR_Q && typeof cur==='number') show(cur);   // 복원 직후 상태 유실 시 자가 복구
  if(hintStage>=3) return; // 정답까지 확인한 뒤에는 더 이상 사용 불가
  const hints=curHints();
  let t,d,c;
@@ -908,6 +922,7 @@ function revealHint(){
 }
 let CUR_Q=null, CUR_ID=null;
 function checkAns(){
+ if(!CUR_Q && typeof cur==='number') show(cur);   // 복원 직후 상태 유실 시 자가 복구
  const inp=document.querySelector('.page.on #ansinput') || document.getElementById('ansinput');
  const raw=(inp?inp.value:'').trim();
  if(!CUR_Q){ return; }
@@ -1248,7 +1263,7 @@ function goResult(){
  const host=fb.parentNode;
  const mk=(id,cls)=>{ let e=document.getElementById(id); if(!e){ e=document.createElement('div'); e.id=id; e.className=cls; host.appendChild(e);} return e; };
  const end=mk('endmsg','endmsg'); end.innerHTML='이야기가 끝났습니다.<br>감사합니다.';
- const acv=mk('acovemark','acovemark'); acv.innerHTML=`<div style="font-family:'Nanum Myeongjo',serif;letter-spacing:normal;text-indent:0;line-height:1.9;"><div style="font-size:15px;font-weight:700;margin-bottom:14px;">도움 주신 분들</div><div style="font-size:15px;font-weight:400;">민주<br>윤정<br>하영</div><div style="font-family:'Space Mono',serif;font-size:12px;letter-spacing:.25em;margin-top:22px;color:#555;font-weight:700;">THANK FOR</div></div>`;
+ const acv=mk('acovemark','acovemark'); acv.innerHTML=`<div style="font-family:'Nanum Myeongjo',serif;letter-spacing:normal;text-indent:0;line-height:1.9;"><div style="font-size:15px;font-weight:700;margin-bottom:14px;">도움 주신 분들</div><div style="font-size:15px;font-weight:400;">민주<br>윤정<br>하영</div><div style="font-family:'Space Mono',serif;font-size:12px;letter-spacing:.25em;margin-top:22px;color:#555;font-weight:700;">Thanks to</div></div>`;
  const wht=mk('endwhite','endwhite');
  [end,acv,wht].forEach(e=>e.classList.remove('on'));
  fb.classList.add('on');                                 // 1) 검은 화면 + 종료 문구
